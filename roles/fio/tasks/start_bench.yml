@@ -1,0 +1,39 @@
+---
+- name: Start benchmark
+  shell: rm -f {{ item[0] }}/fio_test_data_* && fio -filename={{ item[0] }}/fio_test_data_{{ item[1] }}_{{ item[2] }} -direct=1 -iodepth 1 -thread -rw={{ item[2] }} -ioengine=psync -bs={{ item[1] }} -size="{{ fio.size }}" -numjobs="{{ fio.numjobs }}" -runtime="{{ fio.runtime }}" -group_reporting -name="{{ item[0] }}_fio_test_data_{{ item[1] }}_{{ item[2] }}"
+  args:
+    warn: false
+  with_nested: 
+    - "{{ fio.dirs }}"
+    - "{{ fio.block_sizes }}"
+    - ['read', 'write', 'randread', 'randwrite']
+  register: cmd_results
+
+- name: Clean test data
+  shell: rm -f "{{ item[0] }}/fio_test_data_*"
+  args:
+    warn: false
+  loop: "{{ fio.dirs }}"
+
+- name: Analyse header
+  shell: echo "IP, DIR, BlockSize, ReadWrite,IOPS, BW" > "{{ report_path }}"
+  delegate_to: localhost
+
+- name: Analyse result
+  shell: 
+    (printf "{{inventory_hostname}}, " && printf "{{ item.item[0] }}, " && printf "{{ item.item[1] }}, " && printf "{{ item.item[2] }}, " && (echo "{{item.stdout}}" | grep IOPS= | awk '{print $2"="$3}' | awk -F "=" '{print $2,$4}')) >> "{{ report_path }}"
+  loop: "{{ cmd_results.results }}"
+  delegate_to: localhost
+
+- name: Get result
+  shell: cat "{{ report_path }}"
+  register: report
+  delegate_to: localhost
+  run_once: true
+
+- name: Show report
+  debug:
+    msg: "{{ report.stdout_lines }}"
+  delegate_to: localhost
+  run_once: true
+

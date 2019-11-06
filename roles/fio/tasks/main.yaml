@@ -1,0 +1,3 @@
+---
+- include: fio_install.yml
+- include: start_bench.yml

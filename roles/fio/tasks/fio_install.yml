@@ -1,0 +1,77 @@
+---
+# do check
+- name: Yum clean metadata
+  command: yum clean metadata
+  args:
+    warn: no
+
+- name: Check fio present
+  yum:
+    list: fio
+    skip_if_unavailable: true
+    retries: 0
+  register: fio_system_yum_result
+
+# get fio status
+- name: Get fio status self
+  set_fact: 
+     fio_status: "self"
+  when: fio_system_yum_result.results | length > 0 
+
+- name: Get fio status url
+  set_fact: 
+     fio_status: "url"
+  when: 
+    - fio_system_yum_result.results | length > 0 
+    - "{{ yum.use_url_or_rpm }}" == "url"
+
+- name: Get fio status rpm
+  set_fact: 
+     fio_status: "rpm"
+  when: 
+    - fio_system_yum_result.results | length > 0 
+    - "{{ yum.use_url_or_rpm }}" == "rpm"
+
+# befor install repare
+- name: Add yum repo
+  yum_repository:
+    name: iso_with_fio
+    description: base iso repo
+    file: iso_with_fio
+    baseurl: "{{ yum.repo_url }}"
+    gpgcheck: no
+    enabled: yes
+  when:  fio_status == "url"
+
+- name: Copy rpm
+  unarchive: "{{ pak_name }}"
+  dest: "/tmp/fio_rpms/"
+  keep_newer: yes
+  when:  fio_status == "rpm"
+
+# install foi
+- name: Install fio yum
+  yum:
+    name: fio
+    state: present
+  when: fio_status != "rpm"
+
+- name: Install fio rpm
+  yum:
+    name: "/tmp/fio_rpms/*.rpm"
+    state: present
+  when: fio_status == "rpm"
+
+# clean
+- name: Remove repository and clean up
+  yum_repository:
+    name: iso_with_fio
+    state: absent
+  notify: Yum clean metadata
+  when: fio_status == "url"
+
+- name: Remove rpms
+  file:
+    path: "/tmp/fio_rpms"
+    state: absent
+  when: fio_status == "rpm"
