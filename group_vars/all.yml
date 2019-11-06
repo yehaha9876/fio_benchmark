@@ -4,16 +4,17 @@ group: root
 yum:
   # 如果系统没有安装fio，且没有可用yum源
   # 请选择添加新的yum源（url）,或者使用ansibe带的rpm安装(yum)
-  use_url_or_rpm: url
+  use_url_or_rpm: yum
 
   # 如果选用url请填写repo_url
   repo_url: http://192.168.3.23/iso
+  pak_name: fio.tar.gz
 fio:
   size: 2M
   numjobs: 16
   runtime: 60
   dirs:
-    ['/root', '/data']
+    ['/root']
   block_sizes:
     ['8k', '1M']
 report_path: "/root/TestReport.csv"

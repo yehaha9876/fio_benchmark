@@ -3,6 +3,7 @@
   shell: rm -f {{ item[0] }}/fio_test_data_* && fio -filename={{ item[0] }}/fio_test_data_{{ item[1] }}_{{ item[2] }} -direct=1 -iodepth 1 -thread -rw={{ item[2] }} -ioengine=psync -bs={{ item[1] }} -size="{{ fio.size }}" -numjobs="{{ fio.numjobs }}" -runtime="{{ fio.runtime }}" -group_reporting -name="{{ item[0] }}_fio_test_data_{{ item[1] }}_{{ item[2] }}"
   args:
     warn: false
+  ignore_errors: True
   with_nested: 
     - "{{ fio.dirs }}"
     - "{{ fio.block_sizes }}"
@@ -10,7 +11,7 @@
   register: cmd_results
 
 - name: Clean test data
-  shell: rm -f "{{ item[0] }}/fio_test_data_*"
+  shell: rm -f "{{ item }}"/fio_test_data_*
   args:
     warn: false
   loop: "{{ fio.dirs }}"

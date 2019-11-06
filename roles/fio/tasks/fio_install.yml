@@ -4,12 +4,13 @@
   command: yum clean metadata
   args:
     warn: no
+  register: clean_yum
+  ignore_errors: True
 
 - name: Check fio present
   yum:
     list: fio
-    skip_if_unavailable: true
-    retries: 0
+    skip_broken: true
   register: fio_system_yum_result
 
 # get fio status
@@ -22,15 +23,19 @@
   set_fact: 
      fio_status: "url"
   when: 
-    - fio_system_yum_result.results | length > 0 
-    - "{{ yum.use_url_or_rpm }}" == "url"
+    - fio_system_yum_result.results | length == 0 
+    - yum.use_url_or_rpm == 'url'
 
 - name: Get fio status rpm
   set_fact: 
      fio_status: "rpm"
   when: 
-    - fio_system_yum_result.results | length > 0 
-    - "{{ yum.use_url_or_rpm }}" == "rpm"
+    - fio_system_yum_result.results | length == 0 
+    - fio_status is undefined
+
+- name: show type
+  debug:
+    msg: "fio_status: {{ fio_status }}"
 
 # befor install repare
 - name: Add yum repo
@@ -43,10 +48,17 @@
     enabled: yes
   when:  fio_status == "url"
 
+- name: Create tmp dir
+  file:
+    path: "/tmp/fio_rpms"
+    state: directory
+  when:  fio_status == "rpm"
+
 - name: Copy rpm
-  unarchive: "{{ pak_name }}"
-  dest: "/tmp/fio_rpms/"
-  keep_newer: yes
+  unarchive: 
+    src: "{{ yum.pak_name }}"
+    dest: "/tmp/fio_rpms/"
+    keep_newer: yes
   when:  fio_status == "rpm"
 
 # install foi
@@ -56,9 +68,20 @@
     state: present
   when: fio_status != "rpm"
 
+- name: find rpm files and register the result 
+  find:
+    paths: /tmp/fio_rpms/
+    patterns: "*.rpm"
+  register: rpm_files
+  when: fio_status == "rpm"
+
+- set_fact:
+    rpm_list: "{{ rpm_files.files | map(attribute='path') | list}}"
+  when: fio_status == "rpm"
+
 - name: Install fio rpm
   yum:
-    name: "/tmp/fio_rpms/*.rpm"
+    name: "{{ rpm_list }}"
     state: present
   when: fio_status == "rpm"
 
@@ -67,7 +90,6 @@
   yum_repository:
     name: iso_with_fio
     state: absent
-  notify: Yum clean metadata
   when: fio_status == "url"
 
 - name: Remove rpms
